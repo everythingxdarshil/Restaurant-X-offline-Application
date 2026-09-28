@@ -77,7 +77,7 @@ export class SetupApi {
     const result = await response.json().catch(() => ({}));
     const routeMissing = !result.message || /\broute\b.*\bnot found\b|\bcould not be found\b/i.test(result.message);
     if (response.status === 404 && path.startsWith('/api/v1/desktop/') && routeMissing) {
-      throw new Error('Server does not have Rest-X desktop API. Deploy latest Rest-X backend first.');
+      throw new Error('Server does not have Offline POS desktop API. Deploy latest backend first.');
     }
     if (!response.ok) throw new Error(result.message || `Server returned HTTP ${response.status}.`);
     return result;

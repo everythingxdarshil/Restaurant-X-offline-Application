@@ -14,7 +14,7 @@ retry.addEventListener('click', async () => {
   try {
     await window.restxDesktop.restartRuntime();
   } catch {
-    status.textContent = 'Local Rest-X service could not restart.';
+    status.textContent = 'Local Offline POS service could not restart.';
     actions.hidden = false;
   }
 });

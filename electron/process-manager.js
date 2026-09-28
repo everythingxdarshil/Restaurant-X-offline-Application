@@ -56,7 +56,7 @@ export async function waitForHealth(url, { attempts = 60, intervalMs = 250 } = {
     await delay(intervalMs);
   }
 
-  throw new Error(`Local Rest-X server did not become healthy at ${url}.`);
+  throw new Error(`Local Offline POS server did not become healthy at ${url}.`);
 }
 
 export class LocalRuntime {
@@ -86,7 +86,7 @@ export class LocalRuntime {
     await this.prepareRuntime(initialSync);
     const port = await findAvailablePort();
     this.origin = `http://${HOST}:${port}`;
-    this.onStatus({ state: 'starting', message: 'Starting local Rest-X service…' });
+    this.onStatus({ state: 'starting', message: 'Starting local Offline POS service…' });
 
     const child = this.spawnProcess([
       'artisan',
@@ -97,7 +97,7 @@ export class LocalRuntime {
     ], { APP_URL: this.origin });
     child.once('exit', (code) => {
       if (code !== 0 && this.running) {
-        this.onStatus({ state: 'failed', message: `Local Rest-X service stopped with code ${code}.` });
+        this.onStatus({ state: 'failed', message: `Local Offline POS service stopped with code ${code}.` });
       }
     });
 
@@ -106,7 +106,7 @@ export class LocalRuntime {
         waitForHealth(`${this.origin}/up`),
         new Promise((_, reject) => {
           child.once('error', reject);
-          child.once('exit', (code) => reject(new Error(`Local Rest-X service exited with code ${code}.`)));
+          child.once('exit', (code) => reject(new Error(`Local Offline POS service exited with code ${code}.`)));
         }),
       ]);
     } catch (error) {
@@ -114,7 +114,7 @@ export class LocalRuntime {
       throw error;
     }
 
-    this.onStatus({ state: 'ready', message: 'Local Rest-X service is ready.' });
+    this.onStatus({ state: 'ready', message: 'Local Offline POS service is ready.' });
     this.spawnProcess(['artisan', 'schedule:work']);
     this.spawnProcess(['artisan', 'queue:work', 'database', '--sleep=2', '--tries=3', '--timeout=90']);
     return this.origin;
@@ -149,7 +149,7 @@ export class LocalRuntime {
     try {
       await Promise.all(required.map((file) => access(file)));
     } catch {
-      throw new Error(`Rest-X runtime is incomplete at ${this.paths.restxRoot}.`);
+      throw new Error(`Offline POS runtime is incomplete at ${this.paths.restxRoot}.`);
     }
   }
 
@@ -235,13 +235,21 @@ export class LocalRuntime {
 
   runArtisan(args) {
     return new Promise((resolve, reject) => {
+      let commandOutput = '';
       const child = spawn(this.paths.phpPath, args, {
         cwd: this.paths.restxRoot, env: this.runtimeEnvironment(), windowsHide: true,
         stdio: ['ignore', 'pipe', 'pipe'],
       });
       this.attachLogs(child);
+      for (const output of [child.stdout, child.stderr]) {
+        output?.on('data', (chunk) => { commandOutput += chunk; });
+      }
       child.once('error', reject);
-      child.once('exit', (code) => code === 0 ? resolve() : reject(new Error(`Local setup command failed with code ${code}.`)));
+      child.once('exit', (code) => {
+        if (code === 0) return resolve();
+        const message = commandOutput.trim().split(/\r?\n/).filter(Boolean).at(-1);
+        reject(new Error(message || `Local setup command failed with code ${code}.`));
+      });
     });
   }
 }

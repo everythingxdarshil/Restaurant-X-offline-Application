@@ -139,7 +139,7 @@ function createWindow() {
 async function showSetup() {
   setupApi = new SetupApi(net.fetch);
   setWindowTitle(DEFAULT_WINDOW_TITLE);
-  mainWindow.setIcon(nativeImage.createEmpty());
+  mainWindow.setIcon(applicationIconPath);
   await mainWindow.loadFile(path.join(currentDirectory, 'setup.html'));
   mainWindow.show();
 }
@@ -171,7 +171,7 @@ async function showRuntime({ initialSync = true } = {}) {
     await mainWindow.loadURL(`${runtimeOrigin}/login`);
     mainWindow.show();
   } catch (error) {
-    sendStatus({ state: 'failed', message: error instanceof Error ? error.message : 'Local Rest-X service failed.' });
+    sendStatus({ state: 'failed', message: error instanceof Error ? error.message : 'Local Offline POS service failed.' });
     mainWindow.show();
   }
 }
@@ -231,8 +231,8 @@ function registerIpc() {
       await dialog.showMessageBox(mainWindow, {
         type: 'error',
         title: 'Unable to change business',
-        message: 'Rest-X could not archive the current business data.',
-        detail: error instanceof Error ? error.message : 'Close other programs using Rest-X data and try again.',
+        message: 'Offline POS could not archive the current business data.',
+        detail: error instanceof Error ? error.message : 'Close other programs using Offline POS data and try again.',
       });
       await showRuntime();
       return { changed: false };

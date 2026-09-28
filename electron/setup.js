@@ -19,7 +19,7 @@ form.addEventListener('submit', async (event) => {
   button.textContent = 'Setting up terminal…';
   try {
     if (!window.restxDesktop?.activateTerminal) {
-      throw new Error('Desktop connection unavailable. Close this page and open Rest-X application.');
+      throw new Error('Desktop connection unavailable. Close this page and open Offline POS application.');
     }
     await window.restxDesktop.activateTerminal({
       serverUrl: byId('server-url').value,

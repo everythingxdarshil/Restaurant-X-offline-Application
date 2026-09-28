@@ -1,7 +1,7 @@
 {
   "name": "rest-x-windows",
-  "version": "0.1.0",
-  "description": "Rest-X Windows desktop application",
+  "version": "0.1.1",
+  "description": "Offline POS Windows desktop application",
   "private": true,
   "type": "module",
   "main": "electron/main.js",
@@ -16,8 +16,8 @@
   },
   "build": {
     "appId": "com.everythingx.restx",
-    "productName": "Rest-X",
-    "artifactName": "Rest-X-${version}-${arch}.${ext}",
+    "productName": "Offline POS",
+    "artifactName": "Offline-POS-${version}-${arch}.${ext}",
     "asar": true,
     "files": [
       "electron/**/*",

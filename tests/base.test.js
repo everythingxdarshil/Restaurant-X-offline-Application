@@ -22,7 +22,7 @@ test('development paths use sibling Rest-X source and system PHP', () => {
   assert.match(paths.brandIconPath, /RestaurantX POS[\\/]brand-icon$/);
 });
 
-test('window branding uses restaurant name and only safe logo URLs', () => {
+test('window branding uses restaurant name and only safe favicon URLs', () => {
   assert.deepEqual(resolveWindowBrand({
     siteName: ' Copper Leaf ', logoUrl: '/storage/logo.png', serverOrigin: 'https://restaurant.example',
   }), { title: 'Copper Leaf', logoUrl: 'https://restaurant.example/storage/logo.png' });
@@ -30,6 +30,7 @@ test('window branding uses restaurant name and only safe logo URLs', () => {
   assert.equal(resolveWindowBrand({
     iconUrl: '/favicon.png', logoUrl: '/logo.png', serverOrigin: 'https://restaurant.example',
   }).logoUrl, 'https://restaurant.example/favicon.png');
+  assert.deepEqual(resolveWindowBrand({}), { title: 'Offline POS', logoUrl: null });
 });
 
 test('desktop preserves the discovered restaurant color during registration and refresh', async () => {
@@ -38,7 +39,7 @@ test('desktop preserves the discovered restaurant color during registration and 
   assert.match(main, /const branding = \{ \.\.\.\(setupApi\.tenant\?\.branding \?\? \{\}\), \.\.\.\(response\.branding \?\? \{\}\) \}/);
 });
 
-test('Windows package and runtime use the Rest-X application icon', async () => {
+test('Windows package and runtime use the Offline POS application icon', async () => {
   const [main, packageJson] = await Promise.all([
     readFile(new URL('../electron/main.js', import.meta.url), 'utf8'),
     readFile(new URL('../package.json', import.meta.url), 'utf8').then(JSON.parse),
@@ -46,6 +47,8 @@ test('Windows package and runtime use the Rest-X application icon', async () => 
 
   assert.equal(packageJson.build.win.icon, 'electron/assets/app-icon.png');
   assert.match(main, /icon: applicationIconPath/);
+  assert.match(main, /mainWindow\?\.setIcon\(icon\)/);
+  assert.match(main, /mainWindow\.setIcon\(applicationIconPath\)/);
   assert.match(main, /app\.setAppUserModelId\('com\.everythingx\.restx'\)/);
 });
 
@@ -118,12 +121,26 @@ test('sandbox preload uses CommonJS and terminal setup needs only server and res
   assert.match(css, /\[hidden\]\s*\{\s*display:\s*none\s*!important;/);
   assert.match(html, /id="server-url"/);
   assert.match(html, /id="restaurant-code"/);
+  assert.match(html, /Business setup code/);
+  assert.doesNotMatch(html, /Restaurant setup code/);
   assert.doesNotMatch(html, /id="login"|id="password"|id="tenant-code"/);
   assert.match(setup, /activateTerminal/);
   assert.match(main, /setupApi\.connect\(payload\.serverUrl\)/);
 });
 
-test('restaurant setup code activates without a separate tenant code', async () => {
+test('bundled profile menu stays clickable and exposes change business', async () => {
+  const buildRoot = new URL('../resources/restx/public/build/', import.meta.url);
+  const manifest = JSON.parse(await readFile(new URL('manifest.json', buildRoot), 'utf8'));
+  const navigation = Object.values(manifest).find((entry) => entry.name === 'operationsNavigationV2');
+
+  assert.ok(navigation);
+  const asset = await readFile(new URL(navigation.file, buildRoot), 'utf8');
+  assert.match(asset, /restxDesktop\?\.changeTenant/);
+  assert.match(asset, /zIndex:9999/);
+  assert.match(asset, /Close profile menu/);
+});
+
+test('business setup code activates without a separate tenant code', async () => {
   let requestedUrl;
   let requestedBody;
   const api = new SetupApi(async (url, options) => {
@@ -161,6 +178,7 @@ test('terminal registration forces initial reference sync before local login', a
   assert.match(main, /showRuntime\(\{ initialSync = true \} = \{\}\)/);
   assert.match(processManager, /start\(\{ initialSync = false \} = \{\}\)/);
   assert.match(processManager, /prepareRuntime\(initialSync\)/);
+  assert.match(processManager, /commandOutput\.trim\(\)\.split/);
   assert.match(processManager, /spawn\('taskkill', \['\/pid', String\(child\.pid\), '\/t', '\/f'\]/);
 });
 
@@ -171,7 +189,7 @@ test('old servers return an actionable desktop API error', async () => {
 
   await assert.rejects(
     api.discover('https://restaurant.example'),
-    /Deploy latest Rest-X backend first/,
+    /Deploy latest backend first/,
   );
 });
 

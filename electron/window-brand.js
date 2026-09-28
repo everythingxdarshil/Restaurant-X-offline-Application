@@ -1,4 +1,4 @@
-export const DEFAULT_WINDOW_TITLE = 'Rest-X';
+export const DEFAULT_WINDOW_TITLE = 'Offline POS';
 
 export function resolveWindowBrand({ siteName, iconUrl, logoUrl, serverOrigin } = {}) {
   const title = String(siteName || '').trim() || DEFAULT_WINDOW_TITLE;

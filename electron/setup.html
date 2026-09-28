@@ -3,16 +3,16 @@
   <head>
     <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'">
-    <title>Set up Rest-X</title><link rel="stylesheet" href="setup.css">
+    <title>Set up Offline POS</title><link rel="stylesheet" href="setup.css">
   </head>
   <body>
     <p id="error" class="error" role="alert" hidden></p>
 
     <section id="server-screen" class="shell">
-      <header class="setup-header"><div class="logo">RX</div><div><h1>Set up Rest-X</h1><p>Connect this Windows terminal to its restaurant and location.</p></div></header>
+      <header class="setup-header"><div class="logo">RX</div><div><h1>Set up Offline POS</h1><p>Connect this Windows terminal to its restaurant and location.</p></div></header>
       <form id="server-form" class="panel"><h2>Connect terminal</h2>
         <label>Server URL<input id="server-url" type="url" placeholder="https://restaurant-x.one" required></label>
-        <label>Restaurant setup code<input id="restaurant-code" autocomplete="one-time-code" maxlength="16" placeholder="Enter 8-character code" required><span class="hint">Ask a manager for the code shown in the Windows app download screen.</span></label>
+        <label>Business setup code<input id="restaurant-code" autocomplete="one-time-code" maxlength="16" placeholder="Enter 8-character code" required><span class="hint">Ask a manager for the code shown in the Windows app download screen.</span></label>
         <button type="submit">Set up terminal</button>
       </form>
     </section>
