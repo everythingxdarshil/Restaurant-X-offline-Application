@@ -1,0 +1,50 @@
+{
+  "name": "rest-x-windows",
+  "version": "0.1.0",
+  "description": "Rest-X Windows desktop application",
+  "private": true,
+  "type": "module",
+  "main": "electron/main.js",
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test",
+    "package:win": "electron-builder --win --x64"
+  },
+  "devDependencies": {
+    "electron": "44.4.5",
+    "electron-builder": "26.15.3"
+  },
+  "build": {
+    "appId": "com.everythingx.restx",
+    "productName": "Rest-X",
+    "artifactName": "Rest-X-${version}-${arch}.${ext}",
+    "asar": true,
+    "files": [
+      "electron/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "resources/php",
+        "to": "php"
+      },
+      {
+        "from": "resources/restx",
+        "to": "restx"
+      }
+    ],
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "icon": "electron/assets/app-icon.png",
+      "target": "nsis"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    }
+  }
+}

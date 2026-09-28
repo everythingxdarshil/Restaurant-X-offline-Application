@@ -1,0 +1,8 @@
+node_modules/
+dist/
+.idea/
+resources/php/*
+resources/restx/*
+!resources/php/README.md
+!resources/restx/README.md
+*.log
