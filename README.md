@@ -1,15 +1,16 @@
 # Rest-X Windows
 
-Electron host for the Rest-X offline-first Windows POS. The application binds one installation to one server, tenant, branch, and location. It runs the existing Laravel/React application locally with SQLite and synchronizes through the Rest-X local-hub APIs.
+Electron host for the Rest-X offline-first Windows POS. The application binds one installation to one server, tenant, and branch. It runs the existing Laravel/React application locally with SQLite and synchronizes through the Rest-X local-hub APIs.
 
 ## Current flow
 
-1. On first launch, enter the Rest-X HTTPS server URL and restaurant code when required.
-2. Sign in as an owner or branch manager. Two-factor authentication is supported.
-3. Choose an authorized branch and location and name the terminal.
-4. The server registers the terminal. Its sync token is hashed on the server and encrypted locally with Windows DPAPI.
-5. The app imports scoped reference data, starts local Laravel, the scheduler, and the database queue worker, then displays the local UI.
-6. Later launches use the saved binding. POS writes remain local while offline and the existing outbox synchronizes when connectivity returns.
+1. Installer asks for the Windows application name and HTTPS server URL.
+2. On first launch, app uses saved server URL and loads public branding. Server URL is not requested again.
+3. Any active staff user signs in. Two-factor authentication is supported.
+4. User chooses an authorized branch. App registers terminal without a business setup code.
+5. Sync token is hashed on server and encrypted locally with Windows DPAPI. Login password is never saved.
+6. App imports scoped reference data, starts local services, and opens the local UI with the same user already signed in.
+7. Later launches use saved binding. POS writes remain local while offline and existing outbox synchronizes when connectivity returns.
 
 Customer data is stored under `%APPDATA%\RestaurantX POS`. Application upgrades do not replace that directory.
 
@@ -48,7 +49,7 @@ Managers can list and revoke terminals through:
 - `GET /api/v1/desktop/terminals`
 - `DELETE /api/v1/desktop/terminals/{installation}`
 
-Both require a short-lived desktop setup token obtained through the tenant-scoped setup login.
+Both require a short-lived desktop setup token obtained through setup login.
 
 ## Recovery
 

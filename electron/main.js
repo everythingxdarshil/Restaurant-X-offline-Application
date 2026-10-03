@@ -4,22 +4,25 @@ import { readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { ensureRuntimeDirectories, resolveRuntimePaths } from './paths.js';
+import { loadInstallerSetup } from './installer-setup.js';
+import { archiveTerminalData } from './terminal-reset.js';
 import { LocalRuntime } from './process-manager.js';
 import { isLocalRuntimeUrl } from './navigation-policy.js';
 import { loadSyncToken, saveSyncToken } from './secret-store.js';
-import { SetupApi } from './setup-api.js';
-import { archiveTerminalData } from './terminal-reset.js';
+import { normalizeServerOrigin, SetupApi } from './setup-api.js';
 import { loadTerminalConfig, saveTerminalConfig } from './terminal-config.js';
 import { DEFAULT_WINDOW_TITLE, resolveWindowBrand } from './window-brand.js';
 
 const currentDirectory = path.dirname(fileURLToPath(import.meta.url));
 const localPagePrefix = pathToFileURL(`${currentDirectory}${path.sep}`).href;
+const setupPageUrl = pathToFileURL(path.join(currentDirectory, 'setup.html')).href;
 const applicationIconPath = path.join(currentDirectory, 'assets', 'app-icon.png');
 let mainWindow;
 let runtime;
 let runtimeOrigin;
 let paths;
 let setupApi;
+let setupUserId;
 let quitting = false;
 let windowTitle = DEFAULT_WINDOW_TITLE;
 
@@ -138,14 +141,55 @@ function createWindow() {
 
 async function showSetup() {
   setupApi = new SetupApi(net.fetch);
+  setupUserId = null;
   setWindowTitle(DEFAULT_WINDOW_TITLE);
   mainWindow.setIcon(applicationIconPath);
   await mainWindow.loadFile(path.join(currentDirectory, 'setup.html'));
   mainWindow.show();
 }
 
-async function showRuntime({ initialSync = true } = {}) {
+async function showRuntime({ initialSync = true, initialLogin = null } = {}) {
   const terminal = await loadTerminalConfig(paths.configPath);
+  const installerSetup = await loadInstallerSetup(paths.installerSetupPath);
+  if (terminal && installerSetup) {
+    let requestedServer;
+    try {
+      requestedServer = normalizeServerOrigin(installerSetup.serverUrl);
+    } catch (error) {
+      await dialog.showMessageBox({
+        type: 'error',
+        message: 'Invalid server URL from installer',
+        detail: error instanceof Error ? error.message : 'Enter a valid server URL during installation.',
+      });
+      await writeFile(paths.installerSetupPath, `${terminal.server_origin}\n`, 'utf8');
+    }
+    if (requestedServer && requestedServer !== normalizeServerOrigin(terminal.server_origin)) {
+      const { response } = await dialog.showMessageBox({
+        type: 'warning',
+        buttons: ['Keep current server', 'Use new server'],
+        defaultId: 0,
+        cancelId: 0,
+        message: 'Change server for this terminal?',
+        detail: `Current server: ${terminal.server_origin}\nNew server: ${requestedServer}\n\nUsing the new server archives local terminal data, including unsynced changes. You can restore it from the archive later.`,
+      });
+      if (response === 1) {
+        try {
+          await archiveTerminalData(paths, terminal);
+          await ensureRuntimeDirectories(paths);
+          await writeFile(paths.installerSetupPath, `${requestedServer}\n`, 'utf8');
+          await showSetup();
+          return;
+        } catch (error) {
+          await dialog.showMessageBox({
+            type: 'error',
+            message: 'Unable to change server',
+            detail: error instanceof Error ? error.message : 'Unable to archive local terminal data.',
+          });
+        }
+      }
+      await writeFile(paths.installerSetupPath, `${terminal.server_origin}\n`, 'utf8');
+    }
+  }
   const token = await loadSyncToken(paths.secretPath, safeStorage);
   if (!terminal || !token) {
     await showSetup();
@@ -165,10 +209,16 @@ async function showRuntime({ initialSync = true } = {}) {
   }
   mainWindow.hide();
   await mainWindow.loadFile(path.join(currentDirectory, 'startup.html'));
-  runtime = new LocalRuntime(paths, terminal, token, sendStatus);
+  runtime = new LocalRuntime(paths, terminal, token, sendStatus, initialLogin);
   try {
     runtimeOrigin = await runtime.start({ initialSync });
-    await mainWindow.loadURL(`${runtimeOrigin}/login`);
+    if (initialLogin) {
+      await mainWindow.loadURL(`${runtimeOrigin}/desktop/initial-login`, {
+        extraHeaders: `X-RestX-Initial-Login: ${initialLogin.token}\r\n`,
+      });
+    } else {
+      await mainWindow.loadURL(`${runtimeOrigin}/login`);
+    }
     mainWindow.show();
   } catch (error) {
     sendStatus({ state: 'failed', message: error instanceof Error ? error.message : 'Local Offline POS service failed.' });
@@ -198,55 +248,66 @@ async function completeTerminalRegistration(response) {
     app_key: `base64:${randomBytes(32).toString('base64')}`,
   });
   await saveSyncToken(paths.secretPath, response.sync_token, safeStorage);
-  setTimeout(() => void showRuntime({ initialSync: true }), 100);
+  const initialLogin = setupUserId ? {
+    userId: setupUserId,
+    token: randomBytes(32).toString('hex'),
+    expiresAt: Math.floor(Date.now() / 1000) + 300,
+  } : null;
+  setupUserId = null;
+  setTimeout(() => void showRuntime({ initialSync: true, initialLogin }), 100);
   return { terminal };
 }
 
 function registerIpc() {
+  const requireSetupPage = (event) => {
+    if (event.senderFrame.url !== setupPageUrl) throw new Error('Terminal setup is available only from the setup screen.');
+  };
+  const setupScopes = async () => ({ scopes: await setupApi.scopes() });
   ipcMain.handle('runtime:restart', async () => {
     await runtime?.stop();
     await showRuntime();
     return true;
   });
   ipcMain.handle('runtime:open-logs', () => shell.openPath(paths.logsRoot));
-  ipcMain.handle('runtime:change-tenant', async () => {
-    const confirmation = await dialog.showMessageBox(mainWindow, {
-      type: 'warning',
-      title: 'Change business',
-      message: 'Change this terminal to another business?',
-      detail: 'Local data for the current business will be archived. Unsynced changes may not exist on the server.',
-      buttons: ['Cancel', 'Change business'],
-      defaultId: 0,
-      cancelId: 0,
-      noLink: true,
-    });
-    if (confirmation.response !== 1) return { changed: false };
-
+  ipcMain.handle('setup:initialize', async (event) => {
+    requireSetupPage(event);
+    const installerSetup = await loadInstallerSetup(paths.installerSetupPath);
     const terminal = await loadTerminalConfig(paths.configPath);
-    mainWindow.hide();
-    try {
-      await runtime?.stop();
-      await archiveTerminalData(paths, terminal);
-    } catch (error) {
-      await dialog.showMessageBox(mainWindow, {
-        type: 'error',
-        title: 'Unable to change business',
-        message: 'Offline POS could not archive the current business data.',
-        detail: error instanceof Error ? error.message : 'Close other programs using Offline POS data and try again.',
-      });
-      await showRuntime();
-      return { changed: false };
-    }
-    runtime = null;
-    runtimeOrigin = null;
-    await ensureRuntimeDirectories(paths);
-    await showSetup();
-    return { changed: true };
+    const serverUrl = installerSetup?.serverUrl || terminal?.server_origin;
+    if (!serverUrl) throw new Error('Server URL is missing. Reinstall Offline POS and enter the server URL during installation.');
+    const result = await setupApi.discover(serverUrl);
+    const branding = result.tenant?.branding ?? result.branding;
+    if (branding) applyWindowBrand({
+      siteName: branding.site_name || result.tenant?.name,
+      iconUrl: branding.icon_url,
+      logoUrl: branding.logo_url,
+      serverOrigin: setupApi.origin,
+    });
+    return { tenant: result.tenant, branding: result.branding };
   });
-  ipcMain.handle('setup:activate', async (_event, payload) => {
-    setupApi.connect(payload.serverUrl);
-    return completeTerminalRegistration(await setupApi.activate(payload.code, {
+  ipcMain.handle('setup:login', async (event, payload) => {
+    requireSetupPage(event);
+    if (!setupApi.origin) throw new Error('Server connection is not initialized.');
+    const result = await setupApi.login(payload.login, payload.password);
+    if (result.requires_two_factor) return { requiresTwoFactor: true };
+    setupUserId = result.user?.id ?? null;
+    return setupScopes();
+  });
+  ipcMain.handle('setup:verify-two-factor', async (event, code) => {
+    requireSetupPage(event);
+    const result = await setupApi.verifyTwoFactor(code);
+    setupUserId = result.user?.id ?? null;
+    return setupScopes();
+  });
+  ipcMain.handle('setup:register', async (event, payload) => {
+    requireSetupPage(event);
+    const scopes = await setupApi.scopes();
+    const branch = scopes.branches.find(({ id }) => id === payload.branchId);
+    if (!branch) throw new Error('Select an available branch.');
+    return completeTerminalRegistration(await setupApi.register({
       terminal_uuid: randomUUID(),
+      name: `${branch.name} POS`,
+      branch_id: branch.id,
       platform: 'windows_pos',
       capabilities: ['orders', 'offline_outbox', 'printing', 'kds'],
       app_version: app.getVersion(),

@@ -60,11 +60,12 @@ export async function waitForHealth(url, { attempts = 60, intervalMs = 250 } = {
 }
 
 export class LocalRuntime {
-  constructor(paths, terminal, syncToken, onStatus = () => {}) {
+  constructor(paths, terminal, syncToken, onStatus = () => {}, initialLogin = null) {
     this.paths = paths;
     this.terminal = terminal;
     this.syncToken = syncToken;
     this.onStatus = onStatus;
+    this.initialLogin = initialLogin;
     this.processes = [];
     this.origin = null;
     this.logStream = null;
@@ -209,6 +210,11 @@ export class LocalRuntime {
       LOCAL_HUB_BRAND_PRIMARY_COLOR: this.terminal.brand_primary_color || '',
       LOCAL_HUB_CLOUD_URL: this.terminal.server_origin, LOCAL_HUB_CLOUD_TOKEN: this.syncToken,
       LOCAL_HUB_ALLOW_INSECURE_LOOPBACK: allowInsecureLoopback ? 'true' : 'false',
+      ...(this.initialLogin ? {
+        LOCAL_HUB_INITIAL_LOGIN_USER_ID: String(this.initialLogin.userId),
+        LOCAL_HUB_INITIAL_LOGIN_TOKEN: this.initialLogin.token,
+        LOCAL_HUB_INITIAL_LOGIN_EXPIRES_AT: String(this.initialLogin.expiresAt),
+      } : {}),
       ...overrides,
     };
   }

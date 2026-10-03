@@ -17,6 +17,7 @@ export function resolveRuntimePaths({ appDataPath, appPath, resourcesPath, isPac
     backupsRoot: path.join(dataRoot, 'backups'),
     logsRoot: path.join(dataRoot, 'logs'),
     configPath: path.join(dataRoot, 'terminal.json'),
+    installerSetupPath: path.join(dataRoot, 'pending-installer-setup.txt'),
     brandIconPath: path.join(dataRoot, 'brand-icon'),
     secretPath: path.join(dataRoot, 'secrets', 'sync-token.bin'),
     bootstrapMarker: path.join(dataRoot, 'bootstrap.complete'),

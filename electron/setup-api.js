@@ -36,19 +36,16 @@ export class SetupApi {
   }
 
   async login(login, password) {
-    if (!this.tenantCode) throw new Error('Resolve a restaurant before signing in.');
     const result = await this.request('/api/v1/desktop/setup/login', {
-      method: 'POST', body: { tenant: this.tenantCode, login, password },
+      method: 'POST', body: {
+        ...(this.tenantCode ? { tenant: this.tenantCode } : {}),
+        login,
+        password,
+      },
     });
     this.setupToken = result.setup_token ?? null;
     this.challengeToken = result.challenge_token ?? null;
     return result;
-  }
-
-  activate(code, payload) {
-    return this.request('/api/v1/desktop/setup/activate', {
-      method: 'POST', body: { code: String(code).trim().toUpperCase(), ...payload },
-    });
   }
 
   async verifyTwoFactor(code) {
@@ -60,7 +57,12 @@ export class SetupApi {
     return result;
   }
 
-  scopes() { return this.request('/api/v1/desktop/setup/scopes', { token: this.setupToken }); }
+  async scopes() {
+    const result = await this.request('/api/v1/desktop/setup/scopes', { token: this.setupToken });
+    this.tenantCode = result.tenant?.code ?? this.tenantCode;
+    this.tenant = result.tenant ?? this.tenant;
+    return result;
+  }
   register(payload) { return this.request('/api/v1/desktop/terminals', { method: 'POST', token: this.setupToken, body: payload }); }
 
   async request(path, { method = 'GET', token = null, body = null } = {}) {

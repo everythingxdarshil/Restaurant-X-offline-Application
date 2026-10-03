@@ -8,6 +8,8 @@ contextBridge.exposeInMainWorld('restxDesktop', {
   },
   restartRuntime: () => ipcRenderer.invoke('runtime:restart'),
   openLogs: () => ipcRenderer.invoke('runtime:open-logs'),
-  changeTenant: () => ipcRenderer.invoke('runtime:change-tenant'),
-  activateTerminal: (payload) => ipcRenderer.invoke('setup:activate', payload),
+  initializeSetup: () => ipcRenderer.invoke('setup:initialize'),
+  loginSetup: (payload) => ipcRenderer.invoke('setup:login', payload),
+  verifySetupTwoFactor: (code) => ipcRenderer.invoke('setup:verify-two-factor', code),
+  registerTerminal: (payload) => ipcRenderer.invoke('setup:register', payload),
 });

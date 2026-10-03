@@ -65,9 +65,7 @@ Example:
 https://restaurant-x.one
 ```
 
-A shared URL cannot identify one tenant. Electron also asks for a restaurant code, such as `spice-garden`.
-
-The discovery endpoint accepts the restaurant code and resolves the tenant before authentication.
+A shared URL cannot identify one tenant. Setup login resolves the tenant only when the login ID belongs to one active tenant. Duplicate login IDs must use a tenant-specific URL.
 
 ### Discovery response
 
@@ -92,28 +90,24 @@ Discovery must not expose users, branches, private settings, credentials, subscr
 
 ## 5. First-run setup flow
 
-1. Electron starts its bundled local runtime.
-2. Electron shows the terminal setup screen.
-3. Manager enters the HTTPS server URL.
-4. Electron calls server discovery.
-5. If the URL is shared, Electron asks for the restaurant code.
-6. Electron displays the resolved restaurant name and logo.
-7. Owner or branch manager signs in using existing Rest-X credentials.
-8. Server returns only branches and locations available to that user.
-9. Electron automatically selects a single option or displays a selector when several options exist.
-10. Manager enters a terminal name, such as `Main Till`.
-11. Electron registers the terminal for the selected tenant, branch, and location.
-12. Server returns a terminal UUID and a dedicated synchronization token.
-13. Electron encrypts the token with Windows DPAPI.
-14. Electron downloads the first scoped reference snapshot.
-15. Local Laravel imports tenant, branch, location, staff, roles, menu, table, tax, printer, and permitted settings data.
-16. Electron verifies local health and displays the local staff login screen.
+1. Installer saves the HTTPS server URL.
+2. Electron loads the saved URL and requests public branding.
+3. Electron shows the branded terminal login screen without another server URL field.
+4. Any active staff user signs in using existing Rest-X credentials.
+5. Server resolves the tenant and returns only branches and locations available to that user.
+6. Electron automatically selects a single option or displays a selector when several options exist.
+7. Electron registers the terminal for the selected tenant, branch, and location.
+8. Server returns a terminal UUID and a dedicated synchronization token.
+9. Electron encrypts the token with Windows DPAPI.
+10. Electron downloads the first scoped reference snapshot.
+11. Local Laravel imports tenant, branch, location, staff, roles, menu, table, tax, printer, and permitted settings data.
+12. Electron verifies local health and signs the same user into the local UI through a short-lived one-time handoff.
 
-Only an owner or authorized branch manager may register or reconfigure a terminal.
+Any active staff user may register a terminal for a branch and location available to that account. Terminal listing and revocation remain restricted to an owner, branch manager, or user with settings-management permission.
 
 ## 6. Daily login flow
 
-After setup, users do not enter the server URL, restaurant code, tenant, branch, or location again.
+After setup, users do not enter the server URL, tenant, branch, or location again.
 
 Staff authenticate against the local database with an existing Rest-X credential:
 
@@ -130,7 +124,7 @@ Every login must enforce all of these rules:
 - user may access the terminal location; and
 - user has permission for the requested feature.
 
-The cloud API currently permits the same email address in different tenants. Cloud setup authentication must therefore include the resolved tenant. It must not search by email without tenant scope.
+The cloud API permits the same login ID in different tenants. Shared-server login works only for a unique active account; ambiguous accounts must use a tenant-specific URL.
 
 ## 7. Terminal identity
 
@@ -161,10 +155,10 @@ GET /api/v1/desktop/discovery?tenant=spice-garden
 
 Responsibilities:
 
-- validate the hostname and optional restaurant code;
+- validate the hostname;
 - resolve one active tenant;
 - return safe branding and authentication capabilities; and
-- indicate whether a restaurant code is required.
+- indicate whether tenant-specific login is required.
 
 ### Setup login
 
@@ -397,7 +391,7 @@ Acceptance: Fresh install, upgrade, rollback, restart, and uninstall preserve ex
 ## 14. Required tests
 
 1. Tenant-specific URL resolves correct tenant.
-2. Shared URL requires a valid restaurant code.
+2. Shared URL accepts a login ID that belongs to one active tenant.
 3. Unknown, inactive, or mismatched tenant is rejected.
 4. Login is scoped to resolved tenant.
 5. Same email in two tenants does not authenticate against wrong tenant.
